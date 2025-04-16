@@ -3,12 +3,10 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "./Ticket.sol";
 import "./PreRegistration.sol";
 
 contract TicketMarketplace is Ownable {
-    using SafeMath for uint256;
-
     struct Listing {
         address seller;
         uint256 price;
@@ -23,7 +21,7 @@ contract TicketMarketplace is Ownable {
     event TicketDelisted(address indexed ticketContract, uint256 indexed tokenId, address seller);
     event PreRegistrationContractAddressUpdated(address newAddress); // Added
 
-    constructor(address _preRegistrationContractAddress) {
+    constructor(address _preRegistrationContractAddress) Ownable(msg.sender) {
         preRegistrationContractAddress = _preRegistrationContractAddress;
     }
 
@@ -34,7 +32,7 @@ contract TicketMarketplace is Ownable {
     }
 
     function listItem(address _ticketContractAddress, uint256 _tokenId, uint256 _price) public {
-        IERC721 ticketContract = IERC721(_ticketContractAddress);
+        Ticket ticketContract = Ticket(_ticketContractAddress);
         require(ticketContract.ownerOf(_tokenId) == msg.sender, "You are not the owner of this ticket.");
         require(listings[_ticketContractAddress][_tokenId].seller == address(0), "Ticket is already listed.");
 
@@ -43,12 +41,11 @@ contract TicketMarketplace is Ownable {
         uint256 profitCapPercentage = preRegistration.getResaleProfitCapPercentage(_ticketContractAddress);
 
         // Calculate maximum allowed resale price
-        uint256 maxResalePrice = originalPrice.add(originalPrice.mul(profitCapPercentage).div(100));
+        uint256 maxResalePrice = originalPrice + (originalPrice /100)*profitCapPercentage;
 
         require(_price <= maxResalePrice, "Listing price exceeds the allowed profit cap.");
 
         listings[_ticketContractAddress][_tokenId] = Listing(msg.sender, _price);
-        IERC721(_ticketContractAddress).approve(address(this), _tokenId); // Allow marketplace to transfer
         emit TicketListed(_ticketContractAddress, _tokenId, msg.sender, _price);
     }
 
@@ -64,8 +61,8 @@ contract TicketMarketplace is Ownable {
         IERC721(_ticketContractAddress).safeTransferFrom(listing.seller, msg.sender, _tokenId);
 
         // Transfer funds to seller (minus marketplace fee)
-        uint256 feeAmount = listing.price.mul(marketplaceFeePercentage).div(100);
-        uint256 sellerAmount = listing.price.sub(feeAmount);
+        uint256 feeAmount = listing.price * (marketplaceFeePercentage / 100);
+        uint256 sellerAmount = listing.price - feeAmount;
         (bool successSeller, ) = payable(listing.seller).call{value: sellerAmount}("");
         require(successSeller, "Seller payment failed.");
 

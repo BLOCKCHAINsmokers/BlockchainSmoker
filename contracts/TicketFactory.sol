@@ -11,6 +11,7 @@ contract TicketFactory is Ownable {
     mapping(address => mapping(address => bool)) public isEventCreator;
     mapping(address => mapping(address => bool)) public marketplaceApproval;
     address public preRegistrationContractAddress;
+    address public loyaltyProgramAddress;
 
     event EventCreated(
         uint256 eventId,
@@ -20,13 +21,23 @@ contract TicketFactory is Ownable {
         string country,
         string city,
         uint256 maxPurchaseQuantityPerBuyer,
-        uint256 resaleProfitCapPercentage // Added
+        uint256 resaleProfitCapPercentage
     );
     event TicketsCreated(address eventContractAddress, string category, uint256 numTickets);
-    event MarketplaceApprovalSet(address eventContractAddress, address marketplaceContract, bool approved);
+    event PreRegistrationApprovalSet(address eventContractAddress, address preRegistrationContract, bool approved);
 
-    constructor(address _preRegistrationContractAddress) {
+    constructor(address _preRegistrationContractAddress) Ownable(msg.sender) {
         preRegistrationContractAddress = _preRegistrationContractAddress;
+    }
+
+    function updatePreRegistrationContractAddress(address _newAddress) public onlyOwner {
+        require(_newAddress != address(0), "Address cannot be zero.");
+        preRegistrationContractAddress = _newAddress;
+    }
+
+    function updateLoyaltyProgramAddress(address _newAddress) public onlyOwner {
+        require(_newAddress != address(0), "Address cannot be zero.");
+        loyaltyProgramAddress = _newAddress;
     }
 
     function createEvent(
@@ -66,17 +77,28 @@ contract TicketFactory is Ownable {
             if (_isFixedSeating && i < _seatNumbers.length) {
                 seatNumber = _seatNumbers[i];
             }
-            eventContract.mint(msg.sender, _category, _price, seatNumber);
+            eventContract.mint(address(this), _category, _price, seatNumber);
         }
+        preRegistration.setAvailableTickets(_eventContractAddress, _category, _numTickets);
+        preRegistration.setTicketPrice(_eventContractAddress, _category, _price);
         preRegistration.recordMintedTickets(_eventContractAddress, _category, _numTickets);
         emit TicketsCreated(_eventContractAddress, _category, _numTickets);
     }
 
-    function setApprovalForMarketplace(address _eventContractAddress, address _marketplaceContract, bool _approved) public onlyEventCreator(_eventContractAddress) {
-        marketplaceApproval[_eventContractAddress][_marketplaceContract] = _approved;
+    function setApprovalForPreRegistration(address _eventContractAddress, bool _approved) public onlyEventCreator(_eventContractAddress) {
         Ticket eventContract = Ticket(_eventContractAddress);
-        eventContract.setApprovalForAll(_marketplaceContract, _approved);
-        emit MarketplaceApprovalSet(_eventContractAddress, _marketplaceContract, _approved);
+        eventContract.setApprovalForAll(preRegistrationContractAddress, _approved);
+        emit PreRegistrationApprovalSet(_eventContractAddress, preRegistrationContractAddress, _approved);
+    }
+
+    function useTicket(
+        address _eventContractAddress,
+        uint256 _tokenId
+    ) public onlyEventCreator(_eventContractAddress) {
+        Ticket eventContract = Ticket(_eventContractAddress);
+        eventContract.markAsUsed(_tokenId);
+        LoyaltyProgram loyaltyProgram = LoyaltyProgram(loyaltyProgramAddress);
+        loyaltyProgram.addPoints(eventContract.ownerOf(_tokenId), 1); // Assuming 1 point per ticket used
     }
 
     modifier onlyEventCreator(address _eventContractAddress) {
