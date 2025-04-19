@@ -25,9 +25,10 @@ describe("LoyaltyProgram", function () {
 
   it("Should allow the owner to trigger a reward redemption (basic check)", async function () {
     await loyaltyProgram.connect(ticketFactory).addPoints(user1.address, 1000);
-    await expect(loyaltyProgram.redeemRewards(user1.address, 1))
+    await loyaltyProgram.addReward("Free Drink", 1, 1000);
+    await expect(loyaltyProgram.redeemReward(user1.address, 0))
       .to.emit(loyaltyProgram, "RewardRedeemed")
-      .withArgs(user1.address, 1);
+      .withArgs(user1.address, 0);
     // Add more specific logic for reward redemption in the contract and tests
   });
 });
