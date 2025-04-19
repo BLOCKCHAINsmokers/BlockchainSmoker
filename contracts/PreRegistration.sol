@@ -32,7 +32,7 @@ contract PreRegistration is Ownable {
     event PaymentRefunded(address eventContract, address user, uint256 amount);
     event MaxPurchaseQuantitySet(address eventContract, uint256 quantity);
     event ResaleProfitCapPercentageSet(address eventContract, uint256 percentage);
-    event LoyaltyProgramAddressUpdated(address newAddress); // Added
+    event TicketFactoryAddressUpdated(address newAddress);
 
     uint256 public purchaseSlotDuration = 3600; // 1 hour in seconds
     uint256 public bufferBetweenSlots = 1800; // 30 minutes in seconds
@@ -44,6 +44,7 @@ contract PreRegistration is Ownable {
     function updateTicketFactoryAddress(address _newAddress) public onlyOwner {
         require(_newAddress != address(0), "Address cannot be zero.");
         ticketFactoryAddress = _newAddress;
+        emit TicketFactoryAddressUpdated(_newAddress);
     }
 
     function setPointsPerTicket(uint256 _points) public onlyOwner {
