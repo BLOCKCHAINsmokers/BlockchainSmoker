@@ -9,7 +9,6 @@ contract TicketFactory is Ownable {
     mapping(uint256 => address) public eventContracts;
     uint256 public eventCount;
     mapping(address => mapping(address => bool)) public isEventCreator;
-    mapping(address => mapping(address => bool)) public marketplaceApproval;
     address public preRegistrationContractAddress;
     address public loyaltyProgramAddress;
 
