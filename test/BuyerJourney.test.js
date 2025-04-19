@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("BuyerJourney", function () {
-  let TicketFactory, ticketFactory, owner, eventCreator, loyaltyProgram, preRegistration, eventAddress;
+  let TicketFactory, ticketFactory, owner, eventCreator, loyaltyProgram, preRegistration, eventAddress, initialBuyerBalance;
   const maxPurchasePerBuyer = 4;
   const resaleProfitCap = 50; // 50% profit cap
 
@@ -58,14 +58,15 @@ describe("BuyerJourney", function () {
   });
 
   it("Buyer to register and deposit payment before ballot start.", async function () {
+    initialBuyerBalance = await ethers.provider.getBalance(buyer);
     await preRegistration.connect(buyer).registerAndDepositForEvent(eventAddress, { value: ethers.parseEther("1") });
     expect(await preRegistration.isRegistered(eventAddress, buyer.address)).to.equal(true);
     expect(await preRegistration.payments(eventAddress, buyer.address)).to.equal(ethers.parseEther("1"));
   });
 
   it("Buyer can deposit more payment before ballot start", async function () {
-    await preRegistration.connect(buyer).registerAndDepositForEvent(eventAddress, { value: ethers.parseEther("1") });
-    expect(await preRegistration.payments(eventAddress, buyer.address)).to.equal(ethers.parseEther("2"));
+    await preRegistration.connect(buyer).registerAndDepositForEvent(eventAddress, { value: ethers.parseEther("2") });
+    expect(await preRegistration.payments(eventAddress, buyer.address)).to.equal(ethers.parseEther("3"));
   });
 
   it("Start of balloting: buyer assigned timeslot and buy multiple ticket within the maximum allowed.", async function () {
@@ -88,8 +89,14 @@ describe("BuyerJourney", function () {
     expect(await preRegistration.hasPurchased(eventAddress, buyer.address)).to.equal(true);
   });
 
-  it("Buyer can also check for avaliable tickets", async function () {
+  it("Buyer can also check for avaliable tickets.", async function () {
     expect(await preRegistration.connect(buyer).getAvailableTicketsByCategory(eventAddress, "VIP")).deep.equal([2n, 3n, 4n]);
+  });
+
+  it("Unused money refunded at the end of sales.", async function () {
+    await preRegistration.refundUnusedPayment(eventAddress)
+    const finalBuyerBalance = await ethers.provider.getBalance(buyer);
+    expect(finalBuyerBalance).to.be.closeTo(initialBuyerBalance - ethers.parseEther("2"), ethers.parseEther("0.001"));
   });
 
   it("Owner of ticket will get loyalty point once ticket is used", async function () {
