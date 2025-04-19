@@ -44,14 +44,13 @@ describe("TicketMarketplace", function () {
     await ethers.provider.send("evm_setNextBlockTimestamp", [Number(startTime) + 60]);
     await ethers.provider.send("evm_mine");
     await preRegistration.connect(seller).purchaseTicket(eventAddress, [0]);
+    await ticket.connect(seller).approve(marketplace, 0);
   });
 
   it("Should allow a ticket owner to list their ticket for sale within the profit cap", async function () {
     const originalPrice = await preRegistration.getOriginalPurchasePrice(ticket, 0);
     const capPercentage = await preRegistration.getResaleProfitCapPercentage(ticket);
     const maxResalePrice = originalPrice + (originalPrice / BigInt(100)) * capPercentage;
-
-    await ticket.connect(seller).approve(marketplace, 0);
 
     await expect(marketplace.connect(seller).listItem(ticket, 0, maxResalePrice))
       .to.emit(marketplace, "TicketListed")
@@ -73,7 +72,6 @@ describe("TicketMarketplace", function () {
   });
 
   it("Should allow a buyer to purchase a listed ticket", async function () {
-    await ticket.connect(seller).approve(marketplace, 0);
     await marketplace.connect(seller).listItem(ticket, 0, ethers.parseEther("1.5")); // Original price was 1 ETH, 50% cap allows up to 1.5 ETH
     const initialSellerBalance = await ethers.provider.getBalance(seller);
 
